@@ -1,11 +1,51 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { getTodos } from './api/todos';
 import { AuthContext } from './components/Auth/AuthContext';
+import { ErrorMessage } from './components/ErrorMessage';
+import { Filter } from './components/Filter';
+import { TodoList } from './components/TodoList';
+import { Todo } from './types/Todo';
+
+type FilterStatus = 'all' | 'active' | 'completed';
+
+const filterTodos = (todos: Todo[], filterStatus: FilterStatus) => {
+  switch (filterStatus) {
+    case 'all': return todos;
+    case 'active': return todos.filter(({ completed }) => !completed);
+    case 'completed': return todos.filter(({ completed }) => completed);
+    default: throw new Error('Error: Filter todos');
+  }
+};
 
 export const App: React.FC = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const user = useContext(AuthContext);
   const newTodoField = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState('');
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [visibleTodos, setVisibleTodos] = useState<Todo[]>(todos);
+
+  const handleCloseError = () => {
+    setError('');
+  };
+
+  useEffect(() => {
+    if (user) {
+      getTodos(user.id)
+        .then(todosFromServer => {
+          setTodos(todosFromServer)
+        })
+        .catch(() => setError('Unable get todos from server'))
+    }
+
+    setTimeout(() => setError(''), 3000);
+  }, []);
+
+  useEffect(() => {
+    setVisibleTodos(filterTodos(todos, filterStatus));
+  }, [todos, filterStatus]);
 
   useEffect(() => {
     // focus the element with `ref={newTodoField}`
@@ -38,6 +78,9 @@ export const App: React.FC = () => {
         </header>
 
         <section className="todoapp__main" data-cy="TodoList">
+        <TodoList
+            todos={visibleTodos}
+          />
           <div data-cy="Todo" className="todo completed">
             <label className="todo__status-label">
               <input
@@ -167,6 +210,11 @@ export const App: React.FC = () => {
             4 items left
           </span>
 
+
+
+
+          <Filter filterStatus={filterStatus} onFilter={setFilterStatus} />
+
           <nav className="filter" data-cy="Filter">
             <a
               data-cy="FilterLinkAll"
@@ -202,22 +250,7 @@ export const App: React.FC = () => {
         </footer>
       </div>
 
-      <div
-        data-cy="ErrorNotification"
-        className="notification is-danger is-light has-text-weight-normal"
-      >
-        <button
-          data-cy="HideErrorButton"
-          type="button"
-          className="delete"
-        />
-
-        Unable to add a todo
-        <br />
-        Unable to delete a todo
-        <br />
-        Unable to update a todo
-      </div>
+      <ErrorMessage error={error} onCloseError={handleCloseError}/>
     </div>
   );
 };
